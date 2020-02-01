@@ -6,6 +6,28 @@ def optimize_tourney(df, opt_var, max_or_min):
     '''
     Given a dataframe predictions of match ups, returns dataframe of optimal predictions
     '''
+    # adds variables used for constraints
+    for c in set(df['Slot']):
+        df.loc[df['Slot']==c, 'Round_Game_'+c] = 1
+        df['Round_Game_'+c].fillna(0, inplace=True)
+        
+    teams = set(list(df['TeamID_Strong']) + list(df['TeamID_Weak']))
+    
+    def set_value(rnd, win_tm, w_tm, s_tm, r, t):
+        if rnd==r:
+            if (w_tm==t or s_tm==t):
+                return r
+        if rnd<r:
+            if win_tm==t:
+                return -1
+        return 0
+    set_value_v = np.vectorize(set_value, excluded=['r', 't'])
+
+    for r in set(df['Round']):
+        for t in teams:
+            df[str(t)+'_'+str(r)] = set_value_v(df['Round'], df['TeamID_Winner'], df['TeamID_Weak'], df['TeamID_Strong'], r, t)
+     
+    # creates optimizer object
     solver = pywraplp.Solver('SolveIntegerProblem', pywraplp.Solver.CBC_MIXED_INTEGER_PROGRAMMING)
     x_list = {}
     for i in range(len(df)):
